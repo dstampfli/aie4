@@ -1,19 +1,5 @@
 .DS_Store
-Week 6/Hugging Face/.env
-.chainlit/config.toml
-.chainlit/translations
 
-Week 6/Hugging Face/.chainlit/config.toml
-Week 6/Hugging Face/.chainlit/translations/bn.json
-Week 6/Hugging Face/.chainlit/translations/en-US.json
-Week 6/Hugging Face/.chainlit/translations/gu.json
-Week 6/Hugging Face/.chainlit/translations/he-IL.json
-Week 6/Hugging Face/.chainlit/translations/hi.json
-Week 6/Hugging Face/.chainlit/translations/kn.json
-Week 6/Hugging Face/.chainlit/translations/ml.json
-Week 6/Hugging Face/.chainlit/translations/mr.json
-Week 6/Hugging Face/.chainlit/translations/ta.json
-Week 6/Hugging Face/.chainlit/translations/te.json
-Week 6/Hugging Face/.chainlit/translations/zh-CN.json
-
-Week 6/Hugging Face/__pycache__/app.cpython-311.pyc
+Week 6/Hugging Face/Task 2/__pycache__/*
+Week 6/Hugging Face/Task 2/.env
+Week 6/Hugging Face/Task 2/.chainlit/*

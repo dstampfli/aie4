@@ -2,5 +2,9 @@ chainlit
 langchain-community 
 langchain-core==0.2.40 
 langchain-huggingface==0.0.3 
-nltk
+langchain-openai 
+langchain-qdrant 
 openai
+pymupdf
+ragas==0.1.20 
+tqdm
