@@ -71,7 +71,9 @@ async def on_chat_start():
 ### Rename Chains ###
 @cl.author_rename
 def rename(orig_author: str):
-    rename_dict = {"Test 1": "this is test 1", "Test 2": "this is test 2"}
+    rename_dict = {
+        "Assistant" : "PDF Explorer Bot"
+    }
     return rename_dict.get(orig_author, orig_author)
 
 ### On Message Section ###

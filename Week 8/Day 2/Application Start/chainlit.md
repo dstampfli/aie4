@@ -1,1 +1,1 @@
-# FILL OUT YOUR CHAINLIT MD HERE WITH A DESCRIPTION OF YOUR APPLICATION
+This bot to help users explore the writings of Paul Graham. 
