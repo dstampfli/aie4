@@ -12,15 +12,10 @@ from pydantic import BaseModel, Field
 from langchain.schema.runnable import RunnablePassthrough
 from typing import Any, List, Union
 
-url = "localhost:6334"
+url = "silly_roentgen:6333"
+print(f"url = {url}" )
 
 app = FastAPI()
-
-# llm = VLLMOpenAI(
-#     openai_api_key="wiz-andromeda-001",
-#     openai_api_base="http://192.168.2.42:8000/v1",
-#     model_name="neuralmagic/Meta-Llama-3.1-8B-Instruct-FP8",
-# )
 
 RAG_PROMPT_TEMPLATE = """\
 <|start_header_id|>system<|end_header_id|>
