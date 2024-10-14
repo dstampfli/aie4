@@ -1,18 +1,15 @@
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from langserve import add_routes
-from langchain_community.llms import VLLMOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_ollama import OllamaEmbeddings
 from langchain_ollama.llms import OllamaLLM
 from langchain_qdrant import QdrantVectorStore
 from operator import itemgetter
-from langchain.schema.output_parser import StrOutputParser
 from pydantic import BaseModel, Field
-from langchain.schema.runnable import RunnablePassthrough
 from typing import Any, List, Union
 
-url = "silly_roentgen:6333"
+url = "localhost:6333"
 print(f"url = {url}" )
 
 app = FastAPI()
@@ -72,4 +69,4 @@ add_routes(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
