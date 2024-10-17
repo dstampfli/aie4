@@ -1,6 +1,5 @@
 import os
 from typing import Any
-
 import numpy as np
 from langchain_community.graphs import Neo4jGraph
 
@@ -54,14 +53,12 @@ def get_current_wait_times(hospital: str) -> str:
     return formatted_wait_time
 
 
-def get_most_available_hospital(_: Any) -> dict[str, float]:
+def get_most_available_hospital(tmp: Any) -> dict[str, float]:
     """Find the hospital with the shortest wait time."""
 
     current_hospitals = _get_current_hospitals()
 
-    current_wait_times = [
-        _get_current_wait_time_minutes(h) for h in current_hospitals
-    ]
+    current_wait_times = [_get_current_wait_time_minutes(h) for h in current_hospitals]
 
     best_time_idx = np.argmin(current_wait_times)
     best_hospital = current_hospitals[best_time_idx]

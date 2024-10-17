@@ -1,7 +1,5 @@
 .DS_Store
 
-qdrant_storage/*
-
 Week 6/Hugging Face/Task 2/__pycache__/*
 Week 6/Hugging Face/Task 2/.env
 Week 6/Hugging Face/Task 2/.chainlit/*
@@ -10,3 +8,6 @@ Week 6/Hugging Face/Final/.env
 Week 6/Hugging Face/Final/.chainlit/*
 
 Week 8/Day 1/cache/*
+
+Demo/.env
+

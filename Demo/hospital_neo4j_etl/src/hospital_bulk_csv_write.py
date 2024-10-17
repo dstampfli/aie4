@@ -1,29 +1,33 @@
-import logging
 import os
-
-from neo4j import GraphDatabase
+import logging
 from retry import retry
+from neo4j import GraphDatabase
 
+# Paths to CSV files containing hospital data
 HOSPITALS_CSV_PATH = os.getenv("HOSPITALS_CSV_PATH")
 PAYERS_CSV_PATH = os.getenv("PAYERS_CSV_PATH")
 PHYSICIANS_CSV_PATH = os.getenv("PHYSICIANS_CSV_PATH")
 PATIENTS_CSV_PATH = os.getenv("PATIENTS_CSV_PATH")
 VISITS_CSV_PATH = os.getenv("VISITS_CSV_PATH")
 REVIEWS_CSV_PATH = os.getenv("REVIEWS_CSV_PATH")
+EXAMPLE_CYPHER_CSV_PATH = os.getenv("EXAMPLE_CYPHER_CSV_PATH")
 
+# Neo4j config
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
+# Configure the logging module
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s]: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+
 LOGGER = logging.getLogger(__name__)
 
-NODES = ["Hospital", "Payer", "Physician", "Patient", "Visit", "Review"]
+NODES = ["Hospital", "Payer", "Physician", "Patient", "Visit", "Review", "Question"]
 
 
 def _set_uniqueness_constraints(tx, node):
@@ -37,9 +41,7 @@ def load_hospital_graph_from_csv() -> None:
     """Load structured hospital CSV data following
     a specific ontology into Neo4j"""
 
-    driver = GraphDatabase.driver(
-        NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
-    )
+    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
 
     LOGGER.info("Setting uniqueness constraints on nodes")
     with driver.session(database="neo4j") as session:
@@ -129,6 +131,18 @@ def load_hospital_graph_from_csv() -> None:
                          patient_name: reviews.patient_name,
                          physician_name: reviews.physician_name,
                          hospital_name: reviews.hospital_name
+                        }});
+        """
+        _ = session.run(query, {})
+
+    LOGGER.info("Loading question nodes")
+    with driver.session(database="neo4j") as session:
+        query = f"""
+        LOAD CSV WITH HEADERS
+        FROM '{EXAMPLE_CYPHER_CSV_PATH}' AS questions
+        MERGE (Q:Question {{
+                         question: questions.question,
+                         cypher: questions.cypher
                         }});
         """
         _ = session.run(query, {})
