@@ -10,4 +10,6 @@ Week 6/Hugging Face/Final/.chainlit/*
 Week 8/Day 1/cache/*
 
 Demo/.env
-Demo/Sample/.env
+Demo/aie4_demo_sa_credentials.json
+Demo/app/.env
+Demo/app/aie4_demo_sa_credentials.json
