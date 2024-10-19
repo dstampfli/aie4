@@ -11,5 +11,7 @@ Week 8/Day 1/cache/*
 
 Demo/.env
 Demo/aie4_demo_sa_credentials.json
-Demo/app/.env
-Demo/app/aie4_demo_sa_credentials.json
+Demo/app_1/.env
+Demo/app_1/credentials.json
+Demo/app_2/.env
+Demo/app_2/credentials.json

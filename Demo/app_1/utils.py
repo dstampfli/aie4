@@ -17,6 +17,7 @@ from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnablePassthrough
 from langchain_google_genai import ChatGoogleGenerativeAI
 from operator import itemgetter
+import os
 
 def create_embeddings_vertexai(model="text-embedding-004") -> VertexAIEmbeddings:
 
