@@ -1,46 +1,138 @@
-from operator import itemgetter
+# https://github.com/Chainlit/cookbook/blob/main/resume-chat/app.py
 
-from langchain_community.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import Runnable, RunnablePassthrough, RunnableLambda
-from langchain.schema.runnable.config import RunnableConfig
-from langchain.memory import ConversationBufferMemory
+from operator import itemgetter
 
 from chainlit.types import ThreadDict
 import chainlit as cl
 
+from langchain.schema.runnable import Runnable, RunnablePassthrough, RunnableLambda
+from langchain.memory import ConversationBufferMemory
+
+# Additional imports  
+from dotenv import load_dotenv
+import os
+from pprint import pprint
+import uuid
+
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from langchain_google_community import VertexAISearchRetriever
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.prompts import PromptTemplate
+from langchain.schema import Document
+
+def init_env_vars():
+    # Load environment variables from the .env file
+    load_dotenv()
+
+    # Google ADC - https://cloud.google.com/docs/authentication/provide-credentials-adc
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = 'credentials.json'
+    # Google Cloud Platform Project
+    PROJECT_ID = os.environ['PROJECT_ID']
+    REGION = os.environ['REGION']
+    # Vertex AI Agent Builder Data Store
+    LOCATION_ID = os.environ['LOCATION_ID']
+    DATA_STORE_ID = os.environ['DATA_STORE_ID']
+
+    # LangChain 
+    LANGCHAIN_PROJECT=os.environ['LANGCHAIN_PROJECT'] 
+    os.environ['LANGCHAIN_PROJECT'] = LANGCHAIN_PROJECT + f" - {uuid.uuid4().hex[0:8]}"
+    # print(LANGCHAIN_PROJECT)
+
 def setup_runnable():
+    
+    # Get conversation history from session state 
     memory = cl.user_session.get("memory")  # type: ConversationBufferMemory
-    model = ChatOpenAI(streaming=True)
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful chatbot"),
-            MessagesPlaceholder(variable_name="history"),
-            ("human", "{question}"),
-        ]
+    
+    # Create the retriever
+    max_documents = 5
+    retriever = VertexAISearchRetriever(project_id=os.environ['PROJECT_ID'], 
+                                        location_id=os.environ['LOCATION_ID'], 
+                                        data_store_id=os.environ['DATA_STORE_ID'], 
+                                        max_documents=max_documents)
+
+    # Create the llm
+    llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            temperature=0,
+            safety_settings={
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+                },
+            )
+    
+    # Create the prompt 
+    # prompt_template = """
+    # Based on the following conversation history:
+    # {history}
+
+    # And the relevant document context:
+    # {context}
+
+    # Answer the following question:
+    # {question}
+
+    # If the answer to the question is not in the relevant document context, answer "The answer to your question is not in documents provided."
+    # """
+
+    prompt_template = """
+    You are a helpful conversational agent for the State of California.
+    Your expertise is fully understanding the California Health & Wellness health plan. 
+    You need to answer questions posed by the member, who is trying to get answers about their health plan.  
+    Your goal is to provide a helpful and detailed response, in at least 2-3 sentences. 
+
+    You will be analyzing the health plan documents to derive a good answer, based on the following information:
+    1. The question asked.
+    2. The provided context, which comes from health plan document. You will need to answer the question based on the provided context and the conversation history.
+
+    Now it's your turn!
+
+    {question}
+
+    {context}
+
+    {history}
+    """
+
+    prompt = PromptTemplate(
+        template=prompt_template,
+        input_variables=["history", "context", "question"]
     )
 
+    # Create the LCEL pipeline
     runnable = (
-        RunnablePassthrough.assign(
-            history=RunnableLambda(memory.load_memory_variables) | itemgetter("history")
-        )
-        | prompt
-        | model
-        | StrOutputParser()
+        # Step 1: Create a dictionary with "context" and "question"
+        # "context" is created by passing the "question" through the retriever (retrieves documents based on the question)
+        # "question" is taken directly from the input.
+        {"context": itemgetter("question") | retriever, "question": itemgetter("question")} 
+        
+        # Step 2: Pass "context" through a lambda function using RunnablePassthrough
+        # This lambda checks if "context" is a Document. 
+        # If it is, it extracts the page_content; otherwise, it just uses the "context" as-is
+        | RunnablePassthrough.assign(context=lambda x: x['context'].page_content if isinstance(x['context'], Document) else x['context'])
+        
+        # Step 3: Load "history" from conversation memory 
+        # The history is assigned via RunnablePassthrough, meaning it will pass the output along to the next step.
+        | RunnablePassthrough.assign(history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"))
+        
+        # Step 4: Create a dictionary with two fields:
+        # "response" is generated by combining the "prompt" and the "llm"
+        # "context" is passed unchanged (extracted earlier and might be transformed into plain text).
+        | {"response": prompt | llm, "question": itemgetter("question"), "context": itemgetter("context")}
     )
+
+    # Save the runnable to the session state 
     cl.user_session.set("runnable", runnable)
-
-
-# @cl.password_auth_callback
-# def auth():
-#     return cl.User(identifier="test")
 
 @cl.on_chat_start
 async def on_chat_start():
-    cl.user_session.set("memory", ConversationBufferMemory(return_messages=True))
-    setup_runnable()
 
+    # Create the memory and save to session state
+    cl.user_session.set("memory", ConversationBufferMemory(return_messages=True))
+    
+    # Create the runnable and save to session state
+    setup_runnable()
 
 @cl.on_chat_resume
 async def on_chat_resume(thread: ThreadDict):
@@ -55,23 +147,22 @@ async def on_chat_resume(thread: ThreadDict):
     cl.user_session.set("memory", memory)
 
     setup_runnable()
-
-
+    
 @cl.on_message
 async def on_message(message: cl.Message):
-    memory = cl.user_session.get("memory")  # type: ConversationBufferMemory
 
+    # Get the memory from session state
+    memory = cl.user_session.get("memory")      # type: ConversationBufferMemory
+    
+    # Get the runnable from session state
     runnable = cl.user_session.get("runnable")  # type: Runnable
-
+    
+    # Get the answer to the question and send it to the UI
     res = cl.Message(content="")
-
-    async for chunk in runnable.astream(
-        {"question": message.content},
-        config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()]),
-    ):
-        await res.stream_token(chunk)
-
-    await res.send()
-
+    res = runnable.invoke({"question": message.content})
+    await cl.Message(content=res['response'].content).send()
+    
+    # Update the conversation memory with question and the answer
     memory.chat_memory.add_user_message(message.content)
-    memory.chat_memory.add_ai_message(res.content)
+    memory.chat_memory.add_ai_message(res['response'].content)
+    # print(len(memory.chat_memory.messages))
