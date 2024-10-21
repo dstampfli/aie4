@@ -11,13 +11,13 @@ from langchain.schema.runnable.config import RunnableConfig
 from langchain.memory import ConversationBufferMemory
 
 # Additional imports  
-import aiofiles
-import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
 import os
 from pprint import pprint
-import uuid
+
+import aiofiles
+import asyncio
 
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from langchain_google_community import VertexAISearchRetriever
@@ -86,35 +86,69 @@ def setup_runnable() -> Runnable:
     # Define the runnable pipeline
     runnable = (
         # Step 1: Extract context and question
-        # "context" is created by retrieving relevant documents based on the "question" using the retriever
-        # The "question" is simply extracted from the input using itemgetter("question")
-        {"context": itemgetter("question") | retriever, "question": itemgetter("question")} 
+        # "context" is created by retrieving relevant documents based on the "question" using the retriever.
+        # The retriever searches for relevant documents related to the question.
+        # The "question" is extracted from the input using itemgetter("question").
+        # itemgetter("question") extracts the "question" from the input object.
+        {"context": itemgetter("question") | retriever, "question": itemgetter("question")}
         
         # Step 2: Transform the context
-        # Check if the "context" is a Document object. If it is, extract its "page_content" (the actual text)
-        # If "context" is not a Document, pass it through as-is
-        # This is handled using a lambda function
+        # After retrieving the documents, we check if "context" is a Document object.
+        # If "context" is a Document, we extract its "page_content" (the actual text of the document).
+        # If "context" is not a Document, we leave it as-is. This transformation ensures that 
+        # only the relevant text is passed to the next step, not the entire Document object.
+        # RunnablePassthrough assigns the new "context" based on this transformation.
         | RunnablePassthrough.assign(context=lambda x: x['context'].page_content if isinstance(x['context'], Document) else x['context'])
         
-        # Step 3: Load and assign history
-        # Load the conversation history from memory using memory.load_memory_variables via a RunnableLambda.
-        # The history is assigned via itemgetter("history"), which retrieves the history from the memory object
-        | RunnablePassthrough.assign(history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"))
+        # Step 3: Inspect the pipeline state
+        # RunnableLambda(inspect) allows you to inspect the intermediate state of the pipeline after Step 2.
+        # This is used for debugging or checking what "context" and "question" contain at this stage.
+        | RunnableLambda(inspect)
 
-        # Step 4: Build the prompt
-        # Combine the context (retrieved in Step 2), the question, and the conversation history (from Step 3) to form a prompt that is passed to the LLM
+        # Step 4: Load and assign history
+        # We load the conversation history from memory (using memory.load_memory_variables) and assign it to the "history" field.
+        # RunnableLambda loads the memory asynchronously, and itemgetter("history") ensures that 
+        # the correct part of the memory object (the history) is passed down the pipeline.
+        | RunnablePassthrough.assign(history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"))
+        
+        # Step 5: Inspect the pipeline state again
+        # Another inspect step is added to debug the pipeline after loading the memory.
+        # This helps ensure that both the "context" and "history" are correctly passed.
+        | RunnableLambda(inspect)
+
+        # Step 6: Build the prompt
+        # Here, we combine the "context", the "question", and the "history" (conversation history) to form a prompt.
+        # This prompt will be passed to the language model (LLM) in the next step.
         | prompt
 
-        # Step 5: Use the language model (LLM)
-        # The LLM processes the prompt to generate a response. This response is then passed to the next step
+        # Step 7: Use the language model (LLM)
+        # The LLM processes the prompt and generates a response based on the given context, question, and history.
+        # This response is passed to the next step for further processing.
         | llm 
+        
+        # Step 8: Inspect the pipeline state again
+        # RunnableLambda(inspect) is used to inspect the LLM's response before it is parsed.
+        # This is useful to debug and ensure that the LLM is generating the expected output.
+        | RunnableLambda(inspect)
 
-        # Step 6: Parse the output
-        # The StrOutputParser converts the LLM's output into a string format suitable for further processing or displaying to the user.
+        # Step 9: Parse the output
+        # The StrOutputParser takes the LLM's raw output and converts it into a string format suitable for further processing
+        # or displaying to the user. This ensures that the output is in a user-friendly format, ready for use.
         | StrOutputParser()
     )
 
     return runnable
+
+async def inspect(state):
+    if os.environ['LOG_TO_FILE'] == 'True':
+        #print(state)
+        await log_to_file(state)
+        return state
+
+async def log_to_file(state):
+    log_entry = f'{state}\n'
+    async with aiofiles.open('chat_log.txt', mode='a') as log_file:
+        await log_file.write(log_entry)
 
 @cl.author_rename
 def rename(orig_author: str):
@@ -126,15 +160,18 @@ def rename(orig_author: str):
     }
     return rename_dict.get(orig_author, orig_author)
 
+import nest_asyncio
+nest_asyncio.apply()
+
 @cl.on_chat_start
 async def on_chat_start():
 
     # Create the memory and save to session state
-    cl.user_session.set("memory", ConversationBufferMemory(return_messages=True))
+    cl.user_session.set('memory', ConversationBufferMemory(return_messages=True))
     
     # Create the runnable and save it to session state
     runnable = setup_runnable()
-    cl.user_session.set("runnable", runnable)
+    cl.user_session.set('runnable', runnable)
 
 @cl.on_chat_resume
 async def on_chat_resume(thread: ThreadDict):
@@ -142,41 +179,40 @@ async def on_chat_resume(thread: ThreadDict):
     memory = ConversationBufferMemory(return_messages=True)
     
     # Load messages 
-    root_messages = [m for m in thread["steps"] if m["parentId"] == None]
+    root_messages = [m for m in thread['steps'] if m['parentId'] == None]
     for message in root_messages:
-        if message["type"] == "user_message":
-            memory.chat_memory.add_user_message(message["output"])
+        if message['type'] == 'user_message':
+            memory.chat_memory.add_user_message(message['output'])
         else:
-            memory.chat_memory.add_ai_message(message["output"])
+            memory.chat_memory.add_ai_message(message['output'])
 
     # Save memory to session state 
-    cl.user_session.set("memory", memory)
+    cl.user_session.set('memory', memory)
 
     # Create the runnable and save it to session state
     runnable = setup_runnable()
-    cl.user_session.set("runnable", runnable)
+    cl.user_session.set('runnable', runnable)
     
 @cl.on_message
 async def on_message(message: cl.Message):
 
     # Get the memory from session state
-    memory = cl.user_session.get("memory")      # type: ConversationBufferMemory
+    memory = cl.user_session.get('memory')      # type: ConversationBufferMemory
     
     # Get the runnable from session state
-    runnable = cl.user_session.get("runnable")  # type: Runnable
+    runnable = cl.user_session.get('runnable')  # type: Runnable
     
     # Steam the response
-    res = cl.Message(content="")
-    async for chunk in runnable.astream({"question": message.content}, config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()])):
+    res = cl.Message(content='')
+    async for chunk in runnable.astream({'question': message.content}, config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()])):
         await res.stream_token(chunk)
     await res.send()
+    # print(message.content)
+    # print(res.content)
     
     # Update the conversation memory with question and the answer
     memory.chat_memory.add_user_message(message.content)
     memory.chat_memory.add_ai_message(res.content)
-
-    print(message.content)
-    print(res.content)
-    print(len(memory.chat_memory.messages))
+    # print(len(memory.chat_memory.messages))
 
     # breakpoint()
