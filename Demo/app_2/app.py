@@ -1,29 +1,23 @@
 # https://github.com/Chainlit/cookbook/blob/main/resume-chat/app.py
 
-from operator import itemgetter
-
 from chainlit.types import ThreadDict
 import chainlit as cl
 
+from datetime import datetime
+from dotenv import load_dotenv
+from operator import itemgetter
+import os
+
+from langchain_google_community import VertexAISearchRetriever
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
+from langchain.schema import Document
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnablePassthrough, RunnableLambda
 from langchain.schema.runnable.config import RunnableConfig
-from langchain.memory import ConversationBufferMemory
-
-# Additional imports  
-from datetime import datetime
-from dotenv import load_dotenv
-import os
-from pprint import pprint
-
-import aiofiles
-import asyncio
 
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
-from langchain_google_community import VertexAISearchRetriever
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
-from langchain.schema import Document
 
 def init_env_vars():
     # Load environment variables from the .env file
@@ -98,15 +92,8 @@ def setup_runnable() -> Runnable:
     return runnable
 
 async def inspect(state):
-    if os.environ['LOG_TO_FILE'] == 'True':
-        #print(state)
-        await log_to_file(state)
-        return state
-
-async def log_to_file(state):
-    log_entry = f'{state}\n'
-    async with aiofiles.open('chat_log.txt', mode='a') as log_file:
-        await log_file.write(log_entry)
+    print(state)
+    return state
 
 @cl.author_rename
 def rename(orig_author: str):
@@ -123,12 +110,6 @@ nest_asyncio.apply()
 
 @cl.on_chat_start
 async def on_chat_start():
-    # Delelete the previous chat history log
-    try:
-        os.remove('chat_log.txt')
-    except: 
-        print('chat_log.txt does not exist')
-
     # Create the memory and save to session state
     cl.user_session.set('memory', ConversationBufferMemory(return_messages=True))
     

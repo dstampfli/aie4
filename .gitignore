@@ -1,5 +1,7 @@
 .DS_Store
 
+.vscode/launch.json
+
 Week 6/Hugging Face/Task 2/__pycache__/*
 Week 6/Hugging Face/Task 2/.env
 Week 6/Hugging Face/Task 2/.chainlit/*
@@ -21,4 +23,3 @@ Demo/app_2/.env
 Demo/app_2/credentials.json
 Demo/app_2/.chainlit
 Demo/app_2/__pycache__/*
-

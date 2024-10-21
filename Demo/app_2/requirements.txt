@@ -1,19 +1,19 @@
 chainlit==1.1.302
-docx2txt
+# docx2txt
 langchain-community 
 langchain-core==0.2.40 
-langchain_experimental 
+# langchain_experimental 
 langchain-google-community 
 langchain-google-genai 
-langchain-huggingface==0.0.3 
-langchain-openai 
-langchain-qdrant 
+# langchain-huggingface==0.0.3 
+# langchain-openai 
+# langchain-qdrant 
 langchain-google-vertexai
 google-cloud-aiplatform
 google-cloud-discoveryengine
-nltk
-openpyxl
-pymupdf
-python-dotenv
-ragas==0.1.20
-tqdm
+# nltk
+# openpyxl
+# pymupdf
+# python-dotenv
+# ragas==0.1.20
+# tqdm
