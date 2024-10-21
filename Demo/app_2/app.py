@@ -85,55 +85,13 @@ def setup_runnable() -> Runnable:
 
     # Define the runnable pipeline
     runnable = (
-        # Step 1: Extract context and question
-        # "context" is created by retrieving relevant documents based on the "question" using the retriever.
-        # The retriever searches for relevant documents related to the question.
-        # The "question" is extracted from the input using itemgetter("question").
-        # itemgetter("question") extracts the "question" from the input object.
         {"context": itemgetter("question") | retriever, "question": itemgetter("question")}
-        
-        # Step 2: Transform the context
-        # After retrieving the documents, we check if "context" is a Document object.
-        # If "context" is a Document, we extract its "page_content" (the actual text of the document).
-        # If "context" is not a Document, we leave it as-is. This transformation ensures that 
-        # only the relevant text is passed to the next step, not the entire Document object.
-        # RunnablePassthrough assigns the new "context" based on this transformation.
-        | RunnablePassthrough.assign(context=lambda x: x['context'].page_content if isinstance(x['context'], Document) else x['context'])
-        
-        # Step 3: Inspect the pipeline state
-        # RunnableLambda(inspect) allows you to inspect the intermediate state of the pipeline after Step 2.
-        # This is used for debugging or checking what "context" and "question" contain at this stage.
-        | RunnableLambda(inspect)
-
-        # Step 4: Load and assign history
-        # We load the conversation history from memory (using memory.load_memory_variables) and assign it to the "history" field.
-        # RunnableLambda loads the memory asynchronously, and itemgetter("history") ensures that 
-        # the correct part of the memory object (the history) is passed down the pipeline.
+        | RunnablePassthrough.assign(context=lambda x: x['context'].page_content if isinstance(x['context'], Document) else x['context'])    
         | RunnablePassthrough.assign(history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"))
-        
-        # Step 5: Inspect the pipeline state again
-        # Another inspect step is added to debug the pipeline after loading the memory.
-        # This helps ensure that both the "context" and "history" are correctly passed.
         | RunnableLambda(inspect)
-
-        # Step 6: Build the prompt
-        # Here, we combine the "context", the "question", and the "history" (conversation history) to form a prompt.
-        # This prompt will be passed to the language model (LLM) in the next step.
         | prompt
-
-        # Step 7: Use the language model (LLM)
-        # The LLM processes the prompt and generates a response based on the given context, question, and history.
-        # This response is passed to the next step for further processing.
         | llm 
-        
-        # Step 8: Inspect the pipeline state again
-        # RunnableLambda(inspect) is used to inspect the LLM's response before it is parsed.
-        # This is useful to debug and ensure that the LLM is generating the expected output.
         | RunnableLambda(inspect)
-
-        # Step 9: Parse the output
-        # The StrOutputParser takes the LLM's raw output and converts it into a string format suitable for further processing
-        # or displaying to the user. This ensures that the output is in a user-friendly format, ready for use.
         | StrOutputParser()
     )
 
@@ -165,6 +123,11 @@ nest_asyncio.apply()
 
 @cl.on_chat_start
 async def on_chat_start():
+    # Delelete the previous chat history log
+    try:
+        os.remove('chat_log.txt')
+    except: 
+        print('chat_log.txt does not exist')
 
     # Create the memory and save to session state
     cl.user_session.set('memory', ConversationBufferMemory(return_messages=True))
