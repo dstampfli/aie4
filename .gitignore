@@ -19,7 +19,8 @@ Demo/app_1/credentials.json
 Demo/app_1/.chainlit
 Demo/app_1/__pycache__/*
 
-Demo/app_2/.env
 Demo/app_2/credentials.json
+Demo/app_2/.env
 Demo/app_2/.chainlit
+Demo/app_2/content/*
 Demo/app_2/__pycache__/*

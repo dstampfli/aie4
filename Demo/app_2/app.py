@@ -1,15 +1,17 @@
 # https://github.com/Chainlit/cookbook/blob/main/resume-chat/app.py
 
-from chainlit.types import ThreadDict
-import chainlit as cl
-
 from datetime import datetime
 from dotenv import load_dotenv
 from operator import itemgetter
 import os
 
+from chainlit.types import ThreadDict
+import chainlit as cl
+
+from langchain_community.vectorstores import FAISS
 from langchain_google_community import VertexAISearchRetriever
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai import VertexAIEmbeddings
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
@@ -18,8 +20,14 @@ from langchain.schema.runnable import Runnable, RunnablePassthrough, RunnableLam
 from langchain.schema.runnable.config import RunnableConfig
 
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
+import vertexai
+
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 
 def init_env_vars():
+    print('init_env_vars')
+
     # Load environment variables from the .env file
     load_dotenv()
 
@@ -27,18 +35,33 @@ def init_env_vars():
     # https://cloud.google.com/docs/authentication/provide-credentials-adc
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = 'credentials.json'
 
+    vertexai.init(project=os.environ['PROJECT_ID'], location=os.environ['REGION'])
+
+def init_faiss_retriever():
+
+    # embeddings = VertexAIEmbeddings(model_name='text-embedding-005')
+    embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
+
+    vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+
+    retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+
+    return retriever
+
 def setup_runnable() -> Runnable:
     
     # Get conversation history from session state 
     memory = cl.user_session.get("memory")  # type: ConversationBufferMemory
     
     # Create the retriever
-    max_documents = 5
-    retriever = VertexAISearchRetriever(project_id=os.environ['PROJECT_ID'], 
-                                        location_id=os.environ['LOCATION_ID'], 
-                                        data_store_id=os.environ['DATA_STORE_ID'], 
-                                        max_documents=max_documents)
-
+    if os.environ['USE_VERTEX_AI'] == 'False':
+        retriever = init_faiss_retriever()
+    else:
+        retriever = VertexAISearchRetriever(project_id=os.environ['PROJECT_ID'], 
+                                            location_id=os.environ['LOCATION_ID'], 
+                                            data_store_id=os.environ['DATA_STORE_ID'], 
+                                            max_documents=5)
+        
     # Create the llm
     llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash",
@@ -55,7 +78,7 @@ def setup_runnable() -> Runnable:
     # Create the prompt 
     prompt_template = """
     You are a helpful conversational agent for the State of California.
-    Your expertise is fully understanding the California Health & Wellness health plan. 
+    Your expertise is fully understanding the Medi-Cal health plan. 
     You need to answer questions posed by the member, who is trying to get answers about their health plan.  
     Your goal is to provide a helpful and detailed response, in at least 2-3 sentences. 
 
@@ -95,6 +118,10 @@ async def inspect(state):
     print(state)
     return state
 
+init_env_vars()
+
+#####
+
 @cl.author_rename
 def rename(orig_author: str):
     
@@ -104,9 +131,6 @@ def rename(orig_author: str):
         "Assistant" : "Health Plan Chatbot"
     }
     return rename_dict.get(orig_author, orig_author)
-
-import nest_asyncio
-nest_asyncio.apply()
 
 @cl.on_chat_start
 async def on_chat_start():

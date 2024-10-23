@@ -1,11 +1,13 @@
 chainlit==1.1.302
 # docx2txt
+faiss-cpu
+huggingface
 langchain-community 
 langchain-core==0.2.40 
 # langchain_experimental 
 langchain-google-community 
 langchain-google-genai 
-# langchain-huggingface==0.0.3 
+langchain-huggingface==0.0.3 
 # langchain-openai 
 # langchain-qdrant 
 langchain-google-vertexai
