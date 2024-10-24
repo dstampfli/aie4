@@ -2,6 +2,7 @@ chainlit==1.1.302
 # docx2txt
 faiss-cpu
 huggingface
+langchain-cohere
 langchain-community 
 langchain-core==0.2.40 
 # langchain_experimental 

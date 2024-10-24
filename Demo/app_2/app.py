@@ -1,29 +1,27 @@
 # https://github.com/Chainlit/cookbook/blob/main/resume-chat/app.py
 
+from chainlit.types import ThreadDict
 from datetime import datetime
 from dotenv import load_dotenv
-from operator import itemgetter
-import os
-
-from chainlit.types import ThreadDict
-import chainlit as cl
-
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from langchain_cohere import CohereRerank
+from langchain_community.vectorstores import FAISS
 from langchain_community.vectorstores import FAISS
 from langchain_google_community import VertexAISearchRetriever
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import VertexAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
+from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
 from langchain.schema import Document
 from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import Runnable, RunnablePassthrough, RunnableLambda
 from langchain.schema.runnable.config import RunnableConfig
-
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from operator import itemgetter
+import chainlit as cl
+import os
 import vertexai
-
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
 
 def init_env_vars():
     print('init_env_vars')
@@ -37,19 +35,30 @@ def init_env_vars():
 
     vertexai.init(project=os.environ['PROJECT_ID'], location=os.environ['REGION'])
 
+    print(os.environ['USE_VERTEX_AI'])
+    print(os.environ['USE_UNSTRUCTURED'])
+    print(os.environ['PROJECT_ID'])
+    print(os.environ['REGION'])
+    print(os.environ['LOCATION_ID'])
+    print(os.environ['DATA_STORE_ID'])
+
 def init_faiss_retriever():
+    print('init_faiss_retriever')
 
-    # embeddings = VertexAIEmbeddings(model_name='text-embedding-005')
-    embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
+    if os.environ['USE_UNSTRUCTURED'] == True:
+        vector_store = FAISS.load_local("faiss_index_unstructured", HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2'), allow_dangerous_deserialization=True)
+    else:
+        vector_store = FAISS.load_local("faiss_index_pymupdfloader", VertexAIEmbeddings(model_name='text-embedding-004'), allow_dangerous_deserialization=True)
 
-    vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+    retriever = vector_store.as_retriever(search_type='similarity', search_kwargs={'k': 4})
+    compressor = CohereRerank(model="rerank-english-v3.0")
+    compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
 
-    retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
-
-    return retriever
+    return compression_retriever
 
 def setup_runnable() -> Runnable:
-    
+    print('setup_runnable')
+
     # Get conversation history from session state 
     memory = cl.user_session.get("memory")  # type: ConversationBufferMemory
     
@@ -78,8 +87,8 @@ def setup_runnable() -> Runnable:
     # Create the prompt 
     prompt_template = """
     You are a helpful conversational agent for the State of California.
-    Your expertise is fully understanding the Medi-Cal health plan. 
-    You need to answer questions posed by the member, who is trying to get answers about their health plan.  
+    Your expertise is fully understanding the Medi-Cal provider manuals. 
+    You need to answer questions posed by a member, who is trying to get answers about services provided by Medi-Cal.  
     Your goal is to provide a helpful and detailed response, in at least 2-3 sentences. 
 
     You will be analyzing the health plan documents to derive a good answer, based on the following information:
